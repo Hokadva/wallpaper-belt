@@ -18,3 +18,14 @@
 *.ogg
 
 *.json
+*.spec
+!build.spec
+
+__pycache__
+.vscode/
+.pytype/
+.idea/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+__pypackages__/

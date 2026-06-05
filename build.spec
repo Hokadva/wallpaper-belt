@@ -1,23 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_submodules
 
-hiddenimports = []
-hiddenimports += collect_submodules('PyQt6.QtMultimedia')
-
+import sys
+from PyInstaller.utils.hooks import collect_data_files
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=hiddenimports,
+    datas=[('icon.png', '.'), ('wallpaper_config.json', '.')],
+    hiddenimports=['PyQt6.QtMultimedia', 'PyQt6.QtMultimediaWidgets', 'keyboard'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
-    optimize=0,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -26,7 +24,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='main',
+    name='WallpaperBelt',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -39,5 +37,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    uac_admin=True,
+    icon='icon.png',
 )

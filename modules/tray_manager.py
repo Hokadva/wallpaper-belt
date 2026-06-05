@@ -1,29 +1,33 @@
 import os
+import sys
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
 from PyQt6.QtGui import QIcon, QAction
 
-class TrayManager:
-    """Управление иконкой в трее"""
+
+def get_resource_path(relative_path):
+    """Получает правильный путь к ресурсам в собранном приложении"""
+    if getattr(sys, 'frozen', False):
+        # Приложение собрано PyInstaller
+        base_path = sys._MEIPASS
+    else:
+        # Приложение запущено из исходников
+        base_path = os.path.abspath(".")
     
+    return os.path.join(base_path, relative_path)
+
+
+class TrayManager:
     def __init__(self, callbacks):
-        """
-        callbacks: dict с функциями обратного вызова
-        {
-            'show_settings': func,
-            'next_wallpaper': func,
-            'next_group': func,
-            'select_group': func,
-            'exit_app': func
-        }
-        """
         self.callbacks = callbacks
         self.tray_icon = QSystemTrayIcon()
+
+        icon_path = get_resource_path("icon.png")
         
-        if os.path.exists("icon.png"):
-            self.tray_icon.setIcon(QIcon("icon.png"))
+        if os.path.exists(icon_path):
+            self.tray_icon.setIcon(QIcon(icon_path))
         else:
             self.tray_icon.setIcon(QApplication.style().standardIcon(
-                QApplication.style().StandardPixmap.SP_ComputerIcon
+                QApplication.style().StandardPixmap.SP_DesktopIcon
             ))
         
         self.groups_menu = None
@@ -34,25 +38,25 @@ class TrayManager:
         """Создает меню трея"""
         menu = QMenu()
         
-        act_settings = QAction("⚙️ Настройки", menu)
+        act_settings = QAction("Settings", menu)
         act_settings.triggered.connect(self.callbacks['show_settings'])
         menu.addAction(act_settings)
         menu.addSeparator()
         
-        act_next = QAction("➡️ Следующие обои", menu)
+        act_next = QAction("Next wallpaper", menu)
         act_next.triggered.connect(self.callbacks['next_wallpaper'])
         menu.addAction(act_next)
-        
-        act_next_group = QAction("🔄 Следующая группа", menu)
+
+        act_next_group = QAction("Next group", menu)
         act_next_group.triggered.connect(self.callbacks['next_group'])
         menu.addAction(act_next_group)
         menu.addSeparator()
         
-        self.groups_menu = QMenu("📁 Выбрать группу", menu)
+        self.groups_menu = QMenu("Select group", menu)
         menu.addMenu(self.groups_menu)
         menu.addSeparator()
         
-        act_exit = QAction("❌ Выход", menu)
+        act_exit = QAction("Exit", menu)
         act_exit.triggered.connect(self.callbacks['exit_app'])
         menu.addAction(act_exit)
         

@@ -2,25 +2,6 @@
 
 A Windows desktop wallpaper changer with support for static images, GIF animations, and video wallpapers.
 
-## Features
-
-- Support for images (PNG, JPG, JPEG, BMP)
-- Support for videos (MP4, AVI, MKV, MOV, WMV, WebM)
-- Support for GIF animations with customizable FPS
-- Groups for organizing wallpapers
-- Timer-based automatic wallpaper change (1 second to 24 hours)
-- Random or sequential wallpaper order
-- Hotkeys for changing wallpapers and groups
-- Two scaling modes: Fill and Crop
-- 9 focus points for crop mode (interactive grid)
-- Volume control for video wallpapers
-- Drag and drop sorting
-- Quick move buttons for list items
-- System tray integration
-- Auto-start with Windows
-- Fast wallpaper switching without delays
-- Pause animations when desktop is hidden
-
 ## Installation
 
 ### Download executable
@@ -40,16 +21,21 @@ python -m venv venv
 ```
 
 # Windows:
+```
 venv\Scripts\activate
+```
 # Linux/Mac:
+```
 source venv/bin/activate
-
+```
 # Install dependencies
+```
 pip install -r requirements
-
+```
 # Run the application
+```
 python main.py
-
+```
 # Usage
 Basic functions
 Add wallpapers: Click "Add" and select files
@@ -142,4 +128,4 @@ PyQt6
 MIT License
 
 # Links
-Download latest release
+[Download latest release](https://github.com/hokadva/wallpaper-belt/releases)

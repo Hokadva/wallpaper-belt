@@ -38,7 +38,7 @@ class TrayManager:
         """Создает меню трея"""
         menu = QMenu()
         
-        act_settings = QAction("Нстройки", menu)
+        act_settings = QAction("Натройки", menu)
         act_settings.triggered.connect(self.callbacks['show_settings'])
         menu.addAction(act_settings)
         menu.addSeparator()

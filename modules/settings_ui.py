@@ -42,13 +42,18 @@ class SettingsWindow(QMainWindow):
         group_layout = QHBoxLayout()
         self.group_combo = QComboBox()
         self.group_combo.currentTextChanged.connect(self.change_active_group)
-        btn_add_group = QPushButton("➕")
+        btn_add_group = QPushButton("+")
         btn_add_group.setFixedWidth(40)
         btn_add_group.clicked.connect(self.add_new_group)
         btn_add_group.setToolTip("Добавить группу")
+        btn_remove_group = QPushButton("-")
+        btn_remove_group.setFixedWidth(40)
+        btn_remove_group.clicked.connect(self.remove_group)
+        btn_remove_group.setToolTip("Удалить группу")
         group_layout.addWidget(QLabel("Группа:"))
         group_layout.addWidget(self.group_combo, 1)
         group_layout.addWidget(btn_add_group)
+        group_layout.addWidget(btn_remove_group)
         left_layout.addLayout(group_layout)
         
         # Список файлов с Drag & Drop
@@ -388,6 +393,44 @@ class SettingsWindow(QMainWindow):
         self.focus_group.setVisible(self.radio_fit.isChecked())
         self.on_file_setting_changed()
 
+    def remove_group(self):
+        """Удаляет текущую группу"""
+        current_group = self.group_combo.currentText()
+        if not current_group:
+            return
+        
+        groups = list(self.core.config["groups"].keys())
+        if len(groups) <= 1:
+            QMessageBox.warning(self, "Warning", "Невозможно удалить последную группу")
+            return
+        
+        reply = QMessageBox.question(
+            self, "Удалить группу",
+            f"Удалить '{current_group}' и все ссылки обоев в ней?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # Удаляем группу
+            del self.core.config["groups"][current_group]
+            if current_group in self.core.config["group_settings"]:
+                del self.core.config["group_settings"][current_group]
+            
+            # Переключаемся на другую группу
+            remaining = list(self.core.config["groups"].keys())
+            self.core.config["current_group"] = remaining[0]
+            config_manager.save_config(self.core.config)
+            
+            # Обновляем UI
+            self.group_combo.blockSignals(True)
+            self.group_combo.clear()
+            self.group_combo.addItems(remaining)
+            self.group_combo.setCurrentText(remaining[0])
+            self.group_combo.blockSignals(False)
+            
+            self.refresh_file_list()
+            self._load_group_settings()
+
     def on_list_reordered(self, parent, start, end):
         """Вызывается при перетаскивании элементов"""
         self.save_current_order()
@@ -707,7 +750,7 @@ class SettingsWindow(QMainWindow):
         vol = self.slider_volume.value()
         mute = self.chk_mute.isChecked()
         self.lbl_volume_val.setText(f"{vol}%")
-        self.core.wall_window.update_audio_settings(vol, mute)
+        self.core.engine.update_audio_settings(vol, mute)
 
     def change_active_group(self, text):
         if text:
@@ -726,13 +769,49 @@ class SettingsWindow(QMainWindow):
 
     def add_files_to_group(self):
         current_g = self.group_combo.currentText()
-        if not current_g: return
+        if not current_g:
+            return
+        
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Выбор медиа", "", "Медиа (*.png *.jpg *.jpeg *.gif *.mp4 *.avi *.mkv *.mov)"
+            self, "Выбрать медиа", "", 
+            "Media files (*.png *.jpg *.jpeg *.gif *.mp4 *.avi *.mkv *.mov *.webm)"
         )
-        if files:
-            self.core.config["groups"][current_g].extend(files)
+        
+        if not files:
+            return
+        
+        existing_files = set(self.core.config["groups"][current_g])
+        new_files = []
+        duplicates = []
+        
+        for f in files:
+            normalized = os.path.normpath(f)
+            if normalized not in existing_files:
+                new_files.append(normalized)
+                existing_files.add(normalized)
+            else:
+                duplicates.append(os.path.basename(f))
+        
+        if new_files:
+            self.core.config["groups"][current_g].extend(new_files)
             self.refresh_file_list()
+
+        if duplicates:
+            if len(duplicates) <= 3:
+                dup_names = "\n".join(duplicates)
+                QMessageBox.information(
+                    self, "Дупликаты пропущены",
+                    f"Изображения добавлены в группу:\n{dup_names}"
+                )
+            else:
+                QMessageBox.information(
+                    self, "Дупликаты пропущены",
+                    f"{len(duplicates)} добавляемые файлы уже есть в группе."
+                )
+        
+        # Сообщение об успехе
+        if new_files:
+            config_manager.save_config(self.core.config)
 
     def remove_file_from_group(self):
         current_g = self.group_combo.currentText()
@@ -882,8 +961,11 @@ class SettingsWindow(QMainWindow):
         config_manager.save_config(self.core.config)
         self.core.refresh_config()
         
-        self.core.wallpaper_index = 0
-        self.core.next_wallpaper()
+        if self.core.config.get("random_order", False):
+            self.core.random_wallpaper()
+        else:
+            self.core.wallpaper_index = 0
+            self.core.next_wallpaper()
         
         QMessageBox.information(self, "Успех", "Конфигурация обновлена!")
         self.hide()

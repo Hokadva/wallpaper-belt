@@ -6,9 +6,8 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QVideoSink
 import modules.config_manager as config_manager
 import winreg
 
-class WallpaperEngine:
+class WallpaperBelt:
     """Движок для установки обоев рабочего стола"""
-    
     def __init__(self):
         self.media_player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -163,11 +162,11 @@ class WallpaperEngine:
         return pixmap.copy(int(x), int(y), int(tgt_w), int(tgt_h))
     
     def _apply_wallpaper(self, image_path):
-        """Применяет обои через Windows API"""
+        """Применяет обои через реестр (не сохраняет в историю)"""
         try:
             abs_path = os.path.abspath(image_path)
             
-            # Устанавливаем стиль
+            # Устанавливаем стиль Fill
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 r"Control Panel\Desktop",
@@ -175,10 +174,14 @@ class WallpaperEngine:
             )
             winreg.SetValueEx(key, "WallpaperStyle", 0, winreg.REG_SZ, "10")
             winreg.SetValueEx(key, "TileWallpaper", 0, winreg.REG_SZ, "0")
+            
+            # Устанавливаем путь к обоям напрямую в реестр
+            winreg.SetValueEx(key, "Wallpaper", 0, winreg.REG_SZ, abs_path)
             winreg.CloseKey(key)
             
+            # Применяем без сохранения в историю
             SPI_SETDESKWALLPAPER = 20
-            SPIF_SENDCHANGE = 0x02
+            SPIF_SENDCHANGE = 0x02  # Только обновить, не сохранять в профиль
             
             ctypes.windll.user32.SystemParametersInfoW(
                 SPI_SETDESKWALLPAPER, 0, abs_path, SPIF_SENDCHANGE

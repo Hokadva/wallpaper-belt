@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QTimer, QSharedMemory
 
 import modules.config_manager as config_manager
-from modules.wallpaper_window import WallpaperEngine
+from modules.wallpaper_window import WallpaperBelt
 from modules.hotkey_manager import HotkeyManager
 from modules.tray_manager import TrayManager
 from modules.settings_ui import SettingsWindow
@@ -19,7 +19,7 @@ class WallpaperApp:
         self.wallpaper_index = 0
         
         # Инициализация компонентов
-        self.engine = WallpaperEngine()
+        self.engine = WallpaperBelt()
         self.hotkeys = HotkeyManager()
         self.settings_ui = SettingsWindow(self)
         
@@ -88,10 +88,15 @@ class WallpaperApp:
         """Следующие обои по порядку"""
         group = self.config.get("current_group", "Default")
         wallpapers = self.config["groups"].get(group, [])
+        is_random_order = self.config["group_hotkey"]
         
         if not wallpapers:
             return
-        
+
+        if is_random_order:
+            self.random_wallpaper()
+            return
+
         if self.wallpaper_index >= len(wallpapers):
             self.wallpaper_index = 0
         
@@ -177,7 +182,7 @@ if __name__ == "__main__":
         QApplication.setQuitOnLastWindowClosed(False)
         
         # Проверка на второй экземпляр
-        guard = QSharedMemory("WallpaperEngine_SingleInstance")
+        guard = QSharedMemory("WallpaperBelt_SingleInstance")
         if not guard.create(1):
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Icon.Warning)

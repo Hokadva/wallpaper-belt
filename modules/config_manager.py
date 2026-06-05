@@ -3,7 +3,7 @@ import os
 import sys
 import winreg
 
-APP_NAME = "WallpaperEngine"
+APP_NAME = "WallpaperBelt"
 CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 

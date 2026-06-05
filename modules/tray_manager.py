@@ -38,25 +38,25 @@ class TrayManager:
         """Создает меню трея"""
         menu = QMenu()
         
-        act_settings = QAction("Settings", menu)
+        act_settings = QAction("Нстройки", menu)
         act_settings.triggered.connect(self.callbacks['show_settings'])
         menu.addAction(act_settings)
         menu.addSeparator()
         
-        act_next = QAction("Next wallpaper", menu)
+        act_next = QAction("Следующие обои", menu)
         act_next.triggered.connect(self.callbacks['next_wallpaper'])
         menu.addAction(act_next)
 
-        act_next_group = QAction("Next group", menu)
+        act_next_group = QAction("Следующая группа", menu)
         act_next_group.triggered.connect(self.callbacks['next_group'])
         menu.addAction(act_next_group)
         menu.addSeparator()
         
-        self.groups_menu = QMenu("Select group", menu)
+        self.groups_menu = QMenu("Выбрать группу", menu)
         menu.addMenu(self.groups_menu)
         menu.addSeparator()
         
-        act_exit = QAction("Exit", menu)
+        act_exit = QAction("Выйти", menu)
         act_exit.triggered.connect(self.callbacks['exit_app'])
         menu.addAction(act_exit)
         

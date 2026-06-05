@@ -3,39 +3,40 @@ import os
 import sys
 import winreg
 
-# Путь к папке конфигурации в AppData
 APP_NAME = "WallpaperEngine"
 CONFIG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), APP_NAME)
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 
 DEFAULT_CONFIG = {
     "current_group": "Default",
-    "timer_interval_min": 1,
+    "timer_interval_seconds": 300,
     "use_timer": True,
     "hotkey": "ctrl+alt+w",
     "group_hotkey": "ctrl+alt+g",
     "autorun": False,
     "volume": 50,
     "mute": False,
-    "default_scale_mode": "fill",
-    "default_focus_point": "center_center",
-    "default_gif_fps": 10,
     "random_order": False,
     "groups": {
         "Default": []
     },
+    "group_settings": {},  # Настройки для каждой группы
     "file_settings": {}
+}
+
+DEFAULT_GROUP_SETTINGS = {
+    "scale_mode": "fill",
+    "focus_point": "center_center",
+    "gif_fps": 10
 }
 
 
 def _ensure_config_dir():
-    """Создает папку конфигурации если её нет"""
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
 
 
 def load_config():
-    """Загружает конфигурацию"""
     _ensure_config_dir()
     
     if os.path.exists(CONFIG_FILE):
@@ -43,24 +44,33 @@ def load_config():
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
                 config = {**DEFAULT_CONFIG, **loaded}
+                
                 if "file_settings" not in config:
                     config["file_settings"] = {}
+                if "group_settings" not in config:
+                    config["group_settings"] = {}
                 
-                # Нормализуем пути в file_settings
-                normalized_settings = {}
+                # Нормализуем пути
+                normalized_file_settings = {}
                 for path, settings in config["file_settings"].items():
-                    normalized_path = os.path.normpath(path)
-                    normalized_settings[normalized_path] = settings
-                config["file_settings"] = normalized_settings
+                    normalized_file_settings[os.path.normpath(path)] = settings
+                config["file_settings"] = normalized_file_settings
+                
+                # Добавляем дефолтные настройки для групп без настроек
+                for group_name in config["groups"]:
+                    if group_name not in config["group_settings"]:
+                        config["group_settings"][group_name] = DEFAULT_GROUP_SETTINGS.copy()
                 
                 return config
         except:
             return DEFAULT_CONFIG.copy()
-    return DEFAULT_CONFIG.copy()
+    
+    config = DEFAULT_CONFIG.copy()
+    config["group_settings"]["Default"] = DEFAULT_GROUP_SETTINGS.copy()
+    return config
 
 
 def save_config(config):
-    """Сохраняет конфигурацию"""
     _ensure_config_dir()
     
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -69,10 +79,8 @@ def save_config(config):
 
 
 def set_autorun(enable=True):
-    """Настраивает автозапуск"""
-    package_name = "WallpaperEngine"
+    package_name = "WallpaperBelt"
     
-    # Определяем путь к exe или скрипту
     if getattr(sys, 'frozen', False):
         exe_path = sys.executable
     else:
@@ -96,8 +104,21 @@ def set_autorun(enable=True):
         print(f"Registry error: {e}")
 
 
+def get_group_settings(config, group_name):
+    """Получает настройки для группы"""
+    if group_name not in config["group_settings"]:
+        config["group_settings"][group_name] = DEFAULT_GROUP_SETTINGS.copy()
+    return config["group_settings"][group_name]
+
+
+def set_group_settings(config, group_name, settings):
+    """Устанавливает настройки для группы"""
+    config["group_settings"][group_name] = settings
+    save_config(config)
+
+
 def get_file_settings(config, file_path):
-    """Получает настройки для конкретного файла"""
+    """Получает настройки для файла с учетом настроек группы"""
     file_path = os.path.normpath(file_path)
     
     if file_path in config["file_settings"]:
@@ -107,23 +128,25 @@ def get_file_settings(config, file_path):
         if os.path.normpath(saved_path) == file_path:
             return settings
     
+    # Возвращаем настройки группы как значения по умолчанию
+    group_name = config.get("current_group", "Default")
+    group_settings = get_group_settings(config, group_name)
+    
     return {
         "customized": False,
-        "scale_mode": config.get("default_scale_mode", "fill"),
-        "focus_point": config.get("default_focus_point", "center_center"),
-        "gif_fps": config.get("default_gif_fps", 10)
+        "scale_mode": group_settings.get("scale_mode", "fill"),
+        "focus_point": group_settings.get("focus_point", "center_center"),
+        "gif_fps": group_settings.get("gif_fps", 10)
     }
 
 
 def set_file_settings(config, file_path, settings):
-    """Устанавливает настройки для файла"""
     file_path = os.path.normpath(file_path)
     config["file_settings"][file_path] = settings
     save_config(config)
 
 
 def reset_file_settings(config, file_path):
-    """Сбрасывает настройки файла"""
     file_path = os.path.normpath(file_path)
     
     if file_path in config["file_settings"]:

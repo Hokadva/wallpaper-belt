@@ -233,34 +233,47 @@ class SettingsWindow(QMainWindow):
         self.file_settings_group.setLayout(file_settings_layout)
         right_layout.addWidget(self.file_settings_group)
         
-        # Общие настройки
-        general_group = QGroupBox("Общие настройки")
-        general_layout = QVBoxLayout()
-        
-        # Общие настройки отображения
-        general_layout.addWidget(QLabel("Отображение по умолчанию:"))
-        
-        scale_default_layout = QHBoxLayout()
-        self.radio_default_fill = QRadioButton("Заполнить")
-        self.radio_default_fit = QRadioButton("Обрезать")
-        scale_default_layout.addWidget(self.radio_default_fill)
-        scale_default_layout.addWidget(self.radio_default_fit)
-        general_layout.addLayout(scale_default_layout)
+        # === Общие настройки для текущей группы ===
+        self.group_settings_group = QGroupBox("Дефолтные настройки для группы")
+        group_settings_layout = QVBoxLayout()
 
-        # FPS для GIF по умолчанию
-        gif_default_layout = QHBoxLayout()
-        gif_default_layout.addWidget(QLabel("FPS для GIF по умолчанию:"))
-        self.spin_default_gif_fps = QSpinBox()
-        self.spin_default_gif_fps.setRange(1, 30)
-        self.spin_default_gif_fps.setValue(10)
-        gif_default_layout.addWidget(self.spin_default_gif_fps)
-        gif_default_layout.addStretch()
-        general_layout.addLayout(gif_default_layout)
-        
-        # Разделитель
-        separator = QLabel("─" * 30)
-        separator.setStyleSheet("color: #aaa;")
-        general_layout.addWidget(separator)
+        group_settings_layout.addWidget(QLabel("Масштабирование:"))
+
+        # Масштабирование
+        group_scale_layout = QHBoxLayout()
+        self.group_radio_fill = QRadioButton("Заполнить (растянуть)")
+        self.group_radio_fit = QRadioButton("Обрезать")
+        group_scale_layout.addWidget(self.group_radio_fill)
+        group_scale_layout.addWidget(self.group_radio_fit)
+        group_settings_layout.addLayout(group_scale_layout)
+
+        # Чекбокс для показа сетки
+        self.group_chk_show_focus = QCheckBox("Показать сетку фокуса на предпросмотре")
+        self.group_chk_show_focus.toggled.connect(self._on_group_show_focus_toggled)
+        group_settings_layout.addWidget(self.group_chk_show_focus)
+
+        # FPS для GIF
+        gif_layout = QHBoxLayout()
+        gif_layout.addWidget(QLabel("Стандартное фпс у gif:"))
+        self.group_spin_gif_fps = QSpinBox()
+        self.group_spin_gif_fps.setRange(1, 30)
+        self.group_spin_gif_fps.setValue(10)
+        gif_layout.addWidget(self.group_spin_gif_fps)
+        gif_layout.addStretch()
+        group_settings_layout.addLayout(gif_layout)
+
+        # Подсказка для фокуса
+        self.group_focus_hint = QLabel("")
+        self.group_focus_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.group_focus_hint.setStyleSheet("color: #2a82da; font-weight: bold;")
+        self.group_focus_hint.hide()
+        group_settings_layout.addWidget(self.group_focus_hint)
+
+        self.group_settings_group.setLayout(group_settings_layout)
+        right_layout.addWidget(self.group_settings_group)
+
+        general_group = QGroupBox("Основные настройки")
+        general_layout = QVBoxLayout() 
         
         # Звук
         general_layout.addWidget(QLabel("Звук:"))
@@ -341,7 +354,11 @@ class SettingsWindow(QMainWindow):
         
         general_group.setLayout(general_layout)
         right_layout.addWidget(general_group)
-        
+
+        self.group_radio_fill.toggled.connect(lambda: self._save_group_settings())
+        self.group_radio_fit.toggled.connect(lambda: self._save_group_settings())
+        self.group_spin_gif_fps.valueChanged.connect(lambda: self._save_group_settings())
+
         # Кнопка сохранения
         btn_save = QPushButton("💾 Сохранить и применить")
         btn_save.setMinimumHeight(36)
@@ -696,6 +713,7 @@ class SettingsWindow(QMainWindow):
         if text:
             self.core.config["current_group"] = text
             self.refresh_file_list()
+            self._load_group_settings()
 
     def add_new_group(self):
         name, ok = QInputDialog.getText(self, "Новая группа", "Название:")
@@ -726,21 +744,88 @@ class SettingsWindow(QMainWindow):
                 del self.core.config["file_settings"][path]
             self.refresh_file_list()
 
+    def _on_group_show_focus_toggled(self, checked):
+        """Показывает/скрывает сетку для групповых настроек"""
+        if checked:
+            for btn in self.focus_buttons.values():
+                btn.show()
+            self._update_group_focus_hint()
+        else:
+            for btn in self.focus_buttons.values():
+                btn.hide()
+            self.group_focus_hint.hide()
+
+    def _update_group_focus_hint(self, focus_name=None):
+        """Обновляет подсказку для группового фокуса"""
+        hints = {
+            'top_left': 'Focus: Top-Left',
+            'top_center': 'Focus: Top-Center',
+            'top_right': 'Focus: Top-Right',
+            'center_left': 'Focus: Mid-Left',
+            'center_center': 'Focus: Center',
+            'center_right': 'Focus: Mid-Right',
+            'bottom_left': 'Focus: Bottom-Left',
+            'bottom_center': 'Focus: Bottom-Center',
+            'bottom_right': 'Focus: Bottom-Right',
+        }
+        
+        if focus_name:
+            self.group_focus_hint.setText(hints.get(focus_name, ""))
+            self.group_focus_hint.show()
+
+    def _save_group_settings(self):
+        """Сохраняет настройки текущей группы"""
+        group_name = self.group_combo.currentText()
+        if not group_name:
+            return
+        
+        settings = {
+            "scale_mode": "fill" if self.group_radio_fill.isChecked() else "fit",
+            "focus_point": self.get_selected_focus(),
+            "gif_fps": self.group_spin_gif_fps.value()
+        }
+        
+        config_manager.set_group_settings(self.core.config, group_name, settings)
+
+    def _load_group_settings(self):
+        """Загружает настройки текущей группы"""
+        group_name = self.group_combo.currentText()
+        if not group_name:
+            return
+        
+        settings = config_manager.get_group_settings(self.core.config, group_name)
+        
+        self.group_radio_fill.blockSignals(True)
+        self.group_radio_fit.blockSignals(True)
+        self.group_radio_fill.setChecked(settings["scale_mode"] == "fill")
+        self.group_radio_fit.setChecked(settings["scale_mode"] == "fit")
+        self.group_radio_fill.blockSignals(False)
+        self.group_radio_fit.blockSignals(False)
+        
+        # Фокус
+        focus = settings.get("focus_point", "center_center")
+        for name, btn in self.focus_buttons.items():
+            btn.setChecked(name == focus)
+        
+        self.group_chk_show_focus.setEnabled(self.group_radio_fit.isChecked())
+        if not self.group_radio_fit.isChecked():
+            self.group_chk_show_focus.setChecked(False)
+        
+        self.group_spin_gif_fps.setValue(settings.get("gif_fps", 10))
+
     def load_settings_into_ui(self):
         cfg = self.core.config
         self.group_combo.clear()
         self.group_combo.addItems(cfg["groups"].keys())
         self.group_combo.setCurrentText(cfg["current_group"])
         
-        # Загружаем общие настройки отображения
-        default_scale = cfg.get("default_scale_mode", "fill")
-        self.radio_default_fill.setChecked(default_scale == "fill")
-        self.radio_default_fit.setChecked(default_scale == "fit")
+        # Загружаем настройки группы
+        self._load_group_settings()
         
+        # Таймер
         use_timer = cfg.get("use_timer", False)
         self.chk_timer.setChecked(use_timer)
 
-        # Получаем секунды
         if "timer_interval_seconds" in cfg:
             total_seconds = cfg["timer_interval_seconds"]
         else:
@@ -759,8 +844,7 @@ class SettingsWindow(QMainWindow):
         self.spin_seconds.setEnabled(use_timer)
 
         self.chk_random_order.setChecked(cfg.get("random_order", False))
-
-        self.chk_autorun.setChecked(cfg["autorun"])
+        self.chk_autorun.setChecked(cfg.get("autorun", False))
         
         self.temp_wall_hk = cfg.get("hotkey", "ctrl+alt+w")
         self.temp_group_hk = cfg.get("group_hotkey", "ctrl+alt+g")
@@ -770,29 +854,24 @@ class SettingsWindow(QMainWindow):
         self.slider_volume.setValue(cfg.get("volume", 50))
         self.chk_mute.setChecked(cfg.get("mute", False))
         self.lbl_volume_val.setText(f"{self.slider_volume.value()}%")
+        
         self.refresh_file_list()
 
     def save_all_settings(self):
         if self.preview_movie:
             self.preview_movie.stop()
         
-        # Сохраняем общие настройки отображения
-        self.core.config["default_scale_mode"] = "fill" if self.radio_default_fill.isChecked() else "fit"
-        self.core.config["default_gif_fps"] = self.spin_default_gif_fps.value()
+        # Сохраняем настройки группы
+        self._save_group_settings()
         
         self.core.config["random_order"] = self.chk_random_order.isChecked()
         self.core.config["use_timer"] = self.chk_timer.isChecked()
         
-        # Сохраняем в СЕКУНДАХ
         total_seconds = (self.spin_hours.value() * 3600 + 
                         self.spin_minutes.value() * 60 + 
                         self.spin_seconds.value())
-        # Минимум 1 секунда
         total_seconds = max(1, total_seconds)
         self.core.config["timer_interval_seconds"] = total_seconds
-        
-        # Для обратной совместимости сохраняем и минуты
-        self.core.config["timer_interval_min"] = max(1, total_seconds // 60)
         
         self.core.config["autorun"] = self.chk_autorun.isChecked()
         self.core.config["volume"] = self.slider_volume.value()
@@ -802,16 +881,10 @@ class SettingsWindow(QMainWindow):
         
         config_manager.save_config(self.core.config)
         self.core.refresh_config()
-
-        is_random_wallpaper = self.core.config["random_order"]
-
-        if is_random_wallpaper:
-            self.core.random_wallpaper()
-
-        else:
-            self.core.wallpaper_index = 0
-            self.core.next_wallpaper()
-
+        
+        self.core.wallpaper_index = 0
+        self.core.next_wallpaper()
+        
         QMessageBox.information(self, "Успех", "Конфигурация обновлена!")
         self.hide()
 

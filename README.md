@@ -140,5 +140,5 @@ MIT License
 
 # Links
 
- - [https://github.com/Hokadva/wallpaper-belt/releases](Download)
- - [https://github.com/Hokadva/wallpaper-belt/issues](Report a bug)
+ - [Download](https://github.com/Hokadva/wallpaper-belt/releases)
+ - [Report a bug](https://github.com/Hokadva/wallpaper-belt/issues)

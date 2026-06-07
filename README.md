@@ -25,7 +25,7 @@ A Windows desktop wallpaper manager with support for static images, GIF animatio
 
 ### Download
 
-Download the latest `WallpaperBelt.exe` from the [Releases](https://github.com/yourusername/wallpaper-belt/releases) page.
+Download the latest `WallpaperBelt.exe` from the [Releases](https://github.com/hokadva/wallpaper-belt/releases) page.
 
 No installation required — the executable is portable.
 

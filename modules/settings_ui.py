@@ -1,25 +1,24 @@
 import os
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QComboBox, QPushButton, QListWidget, QFileDialog, 
-                             QLabel, QSpinBox, QCheckBox, QMessageBox, QSlider, 
-                             QInputDialog, QRadioButton, QGroupBox,
-                             QScrollArea)
-import os
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QComboBox, QPushButton, QListWidget, QFileDialog, 
-                             QLabel, QSpinBox, QCheckBox, QMessageBox, QSlider, 
-                             QInputDialog, QRadioButton, QGroupBox, QScrollArea,
-                             QListWidgetItem)
+
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QMovie
+from PyQt6.QtGui import QMovie, QPixmap
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGroupBox,
+                             QHBoxLayout, QInputDialog, QLabel, QListWidget,
+                             QListWidgetItem, QMainWindow, QMessageBox,
+                             QPushButton, QRadioButton, QScrollArea, QSlider,
+                             QSpinBox, QVBoxLayout, QWidget, QDialogButtonBox,
+                             QDialog)
+
 import modules.config_manager as config_manager
 
 
 class SettingsWindow(QMainWindow):
-    def __init__(self, app_core):
+    def __init__(self, app_core, localizer):
         super().__init__()
         self.core = app_core
-        self.setWindowTitle("Панель управления обоями")
+        self.loc = localizer
+        
+        self.setWindowTitle(self.loc.get_string("title"))
         self.setMinimumSize(800, 600)
         
         self.recording_target = None 
@@ -27,9 +26,14 @@ class SettingsWindow(QMainWindow):
         self.temp_wall_hk = ""
         self.temp_group_hk = ""
         
+        # Главный виджет
         main_widget = QWidget()
-        h_base_layout = QHBoxLayout(main_widget)
-        h_base_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout = QVBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Основной контент (левая + правая панели)
+        h_base_layout = QHBoxLayout()
+        main_layout.addLayout(h_base_layout, 1)
         
         # ЛЕВАЯ ПАНЕЛЬ
         left_widget = QWidget()
@@ -45,19 +49,20 @@ class SettingsWindow(QMainWindow):
         btn_add_group = QPushButton("+")
         btn_add_group.setFixedWidth(40)
         btn_add_group.clicked.connect(self.add_new_group)
-        btn_add_group.setToolTip("Добавить группу")
+        btn_add_group.setToolTip(self.loc.get_string("add_group"))
         btn_remove_group = QPushButton("-")
         btn_remove_group.setFixedWidth(40)
         btn_remove_group.clicked.connect(self.remove_group)
-        btn_remove_group.setToolTip("Удалить группу")
-        group_layout.addWidget(QLabel("Группа:"))
+        btn_remove_group.setToolTip(self.loc.get_string("remove_group"))
+        group_layout.addWidget(QLabel())
         group_layout.addWidget(self.group_combo, 1)
         group_layout.addWidget(btn_add_group)
         group_layout.addWidget(btn_remove_group)
         left_layout.addLayout(group_layout)
         
         # Список файлов с Drag & Drop
-        left_layout.addWidget(QLabel("Медиафайлы (перетаскивайте для сортировки):"))
+        self.left_layout_label = QLabel()
+        left_layout.addWidget(self.left_layout_label)
         self.file_list = QListWidget()
         self.file_list.setMinimumHeight(200)
         self.file_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
@@ -66,25 +71,25 @@ class SettingsWindow(QMainWindow):
         
         # Кнопки управления файлами
         file_btn_layout = QHBoxLayout()
-        btn_add_file = QPushButton("📁 Добавить")
-        btn_add_file.clicked.connect(self.add_files_to_group)
-        btn_remove_file = QPushButton("🗑 Удалить")
-        btn_remove_file.clicked.connect(self.remove_file_from_group)
-        file_btn_layout.addWidget(btn_add_file)
-        file_btn_layout.addWidget(btn_remove_file)
+        self.btn_add_file = QPushButton(self.loc.get_string("add_files"))
+        self.btn_add_file.clicked.connect(self.add_files_to_group)
+        self.btn_remove_file = QPushButton(self.loc.get_string("remove_files"))
+        self.btn_remove_file.clicked.connect(self.remove_file_from_group)
+        file_btn_layout.addWidget(self.btn_add_file)
+        file_btn_layout.addWidget(self.btn_remove_file)
         left_layout.addLayout(file_btn_layout)
         
         # Кнопки перемещения
-        move_group = QGroupBox("Перемещение")
+        move_group = QGroupBox()
         move_layout = QVBoxLayout()
         
         # Верхний ряд
         top_row = QHBoxLayout()
-        self.btn_move_top = QPushButton("⏫ Вверх")
+        self.btn_move_top = QPushButton()
         self.btn_move_top.clicked.connect(lambda: self.move_item(-999))
-        self.btn_move_up5 = QPushButton("⬆ +5")
+        self.btn_move_up5 = QPushButton("+5")
         self.btn_move_up5.clicked.connect(lambda: self.move_item(-5))
-        self.btn_move_up1 = QPushButton("🔼 +1")
+        self.btn_move_up1 = QPushButton("+1")
         self.btn_move_up1.clicked.connect(lambda: self.move_item(-1))
         top_row.addWidget(self.btn_move_top)
         top_row.addWidget(self.btn_move_up5)
@@ -93,11 +98,11 @@ class SettingsWindow(QMainWindow):
         
         # Нижний ряд
         bottom_row = QHBoxLayout()
-        self.btn_move_bottom = QPushButton("⏬ Вниз")
+        self.btn_move_bottom = QPushButton()
         self.btn_move_bottom.clicked.connect(lambda: self.move_item(999))
-        self.btn_move_down5 = QPushButton("⬇ +5")
+        self.btn_move_down5 = QPushButton("-5")
         self.btn_move_down5.clicked.connect(lambda: self.move_item(5))
-        self.btn_move_down1 = QPushButton("🔽 +1")
+        self.btn_move_down1 = QPushButton("-1")
         self.btn_move_down1.clicked.connect(lambda: self.move_item(1))
         bottom_row.addWidget(self.btn_move_bottom)
         bottom_row.addWidget(self.btn_move_down5)
@@ -118,7 +123,7 @@ class SettingsWindow(QMainWindow):
         right_layout.setSpacing(10)
         
         # Предпросмотр с сеткой фокуса
-        preview_group = QGroupBox("Предпросмотр")
+        self.preview_group = QGroupBox()
         preview_layout = QVBoxLayout()
 
         # Контейнер для предпросмотра с оверлеем
@@ -127,7 +132,7 @@ class SettingsWindow(QMainWindow):
         self.preview_container.setStyleSheet("background-color: #f0f0f0; border: 1px solid #ccc;")
 
         # Label с изображением
-        self.preview_label = QLabel("Выберите файл из списка", self.preview_container)
+        self.preview_label = QLabel(self.loc.get_string("select_file"), self.preview_container)
         self.preview_label.setGeometry(0, 0, 320, 240)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -146,7 +151,7 @@ class SettingsWindow(QMainWindow):
         ]
 
         for name, x, y in focus_positions:
-            btn = QPushButton("◉", self.preview_container)
+            btn = QPushButton("", self.preview_container)
             btn.setFixedSize(25, 25)
             btn.move(x, y)
             btn.setCheckable(True)
@@ -170,15 +175,15 @@ class SettingsWindow(QMainWindow):
             """)
             btn.clicked.connect(lambda checked, n=name: self._on_focus_button_clicked(n))
             btn.setToolTip({
-                'top_left': 'Левый верх',
-                'top_center': 'Центр верх',
-                'top_right': 'Правый верх',
-                'center_left': 'Левый центр',
-                'center_center': 'Центр',
-                'center_right': 'Правый центр',
-                'bottom_left': 'Левый низ',
-                'bottom_center': 'Центр низ',
-                'bottom_right': 'Правый низ',
+                'top_left': self.loc.get_string("focus_top_left"),
+                'top_center': self.loc.get_string("focus_top"),
+                'top_right': self.loc.get_string("focus_top_right"),
+                'center_left': self.loc.get_string("focus_left"),
+                'center_center': self.loc.get_string("focus_center"),
+                'center_right': self.loc.get_string("focus_right"),
+                'bottom_left': self.loc.get_string("focus_bottom_left"),
+                'bottom_center': self.loc.get_string("focus_bottom"),
+                'bottom_right': self.loc.get_string("focus_bottom_right"),
             }[name])
             btn.hide()  # Скрыты по умолчанию
             self.focus_buttons[name] = btn
@@ -186,51 +191,39 @@ class SettingsWindow(QMainWindow):
         preview_layout.addWidget(self.preview_container)
 
         # Подсказка под предпросмотром
-        self.focus_hint_label = QLabel("")
+        self.focus_hint_label = QLabel()
         self.focus_hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.focus_hint_label.setStyleSheet("color: #2a82da; font-weight: bold; padding: 4px;")
         self.focus_hint_label.hide()
         preview_layout.addWidget(self.focus_hint_label)
 
-        preview_group.setLayout(preview_layout)
-        right_layout.addWidget(preview_group)
+        self.preview_group.setLayout(preview_layout)
+        right_layout.addWidget(self.preview_group)
 
         # Индивидуальные настройки файла
-        self.file_settings_group = QGroupBox("Настройки файла")
+        self.file_settings_group = QGroupBox()
         self.file_settings_group.setEnabled(False)
         file_settings_layout = QVBoxLayout()
 
         # Масштабирование
-        file_settings_layout.addWidget(QLabel("Масштабирование:"))
-        self.radio_fill = QRadioButton("Заполнить (растянуть)")
-        self.radio_fit = QRadioButton("Обрезать")
+        self.file_settings_layout_label = QLabel()
+        file_settings_layout.addWidget(self.file_settings_layout_label)
+        self.radio_fill = QRadioButton()
+        self.radio_fit = QRadioButton()
         self.radio_fill.toggled.connect(self._on_scale_mode_changed)
         self.radio_fit.toggled.connect(self._on_scale_mode_changed)
         file_settings_layout.addWidget(self.radio_fill)
         file_settings_layout.addWidget(self.radio_fit)
 
         # Чекбокс показа сетки фокуса
-        self.chk_show_focus_grid = QCheckBox("Показать сетку фокуса на предпросмотре")
+        self.chk_show_focus_grid = QCheckBox()
         self.chk_show_focus_grid.toggled.connect(self._on_show_focus_grid_toggled)
         file_settings_layout.addWidget(self.chk_show_focus_grid)
 
-        # Частота кадров GIF
-        self.gif_widget = QWidget()
-        gif_layout = QHBoxLayout(self.gif_widget)
-        gif_layout.setContentsMargins(0, 0, 0, 0)
-        gif_layout.addWidget(QLabel("FPS для GIF:"))
-        self.spin_gif_fps = QSpinBox()
-        self.spin_gif_fps.setRange(1, 30)
-        self.spin_gif_fps.setValue(10)
-        self.spin_gif_fps.valueChanged.connect(self.on_file_setting_changed)
-        gif_layout.addWidget(self.spin_gif_fps)
-        gif_layout.addStretch()
-        file_settings_layout.addWidget(self.gif_widget)
-
         # Кнопка сброса
-        btn_reset = QPushButton("Сбросить настройки")
-        btn_reset.clicked.connect(self.reset_file_settings)
-        file_settings_layout.addWidget(btn_reset)
+        self.btn_reset = QPushButton()
+        self.btn_reset.clicked.connect(self.reset_file_settings)
+        file_settings_layout.addWidget(self.btn_reset)
 
         self.file_settings_group.setLayout(file_settings_layout)
         right_layout.addWidget(self.file_settings_group)
@@ -239,36 +232,27 @@ class SettingsWindow(QMainWindow):
         right_layout.addWidget(self.file_settings_group)
         
         # === Общие настройки для текущей группы ===
-        self.group_settings_group = QGroupBox("Дефолтные настройки для группы")
+        self.group_settings_group = QGroupBox()
         group_settings_layout = QVBoxLayout()
 
-        group_settings_layout.addWidget(QLabel("Масштабирование:"))
+        self.group_settings_layout_label = QLabel()
+        group_settings_layout.addWidget(self.group_settings_layout_label)
 
         # Масштабирование
         group_scale_layout = QHBoxLayout()
-        self.group_radio_fill = QRadioButton("Заполнить (растянуть)")
-        self.group_radio_fit = QRadioButton("Обрезать")
+        self.group_radio_fill = QRadioButton()
+        self.group_radio_fit = QRadioButton()
         group_scale_layout.addWidget(self.group_radio_fill)
         group_scale_layout.addWidget(self.group_radio_fit)
         group_settings_layout.addLayout(group_scale_layout)
 
         # Чекбокс для показа сетки
-        self.group_chk_show_focus = QCheckBox("Показать сетку фокуса на предпросмотре")
+        self.group_chk_show_focus = QCheckBox()
         self.group_chk_show_focus.toggled.connect(self._on_group_show_focus_toggled)
         group_settings_layout.addWidget(self.group_chk_show_focus)
 
-        # FPS для GIF
-        gif_layout = QHBoxLayout()
-        gif_layout.addWidget(QLabel("Стандартное фпс у gif:"))
-        self.group_spin_gif_fps = QSpinBox()
-        self.group_spin_gif_fps.setRange(1, 30)
-        self.group_spin_gif_fps.setValue(10)
-        gif_layout.addWidget(self.group_spin_gif_fps)
-        gif_layout.addStretch()
-        group_settings_layout.addLayout(gif_layout)
-
         # Подсказка для фокуса
-        self.group_focus_hint = QLabel("")
+        self.group_focus_hint = QLabel()
         self.group_focus_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.group_focus_hint.setStyleSheet("color: #2a82da; font-weight: bold;")
         self.group_focus_hint.hide()
@@ -277,99 +261,91 @@ class SettingsWindow(QMainWindow):
         self.group_settings_group.setLayout(group_settings_layout)
         right_layout.addWidget(self.group_settings_group)
 
-        general_group = QGroupBox("Основные настройки")
-        general_layout = QVBoxLayout() 
-        
-        # Звук
-        general_layout.addWidget(QLabel("Звук:"))
-        audio_layout = QHBoxLayout()
-        self.chk_mute = QCheckBox("Без звука")
-        self.chk_mute.stateChanged.connect(self.on_audio_ui_changed)
-        self.slider_volume = QSlider(Qt.Orientation.Horizontal)
-        self.slider_volume.setRange(0, 100)
-        self.slider_volume.setValue(50)
-        self.slider_volume.valueChanged.connect(self.on_audio_ui_changed)
-        self.lbl_volume_val = QLabel("50%")
-        self.lbl_volume_val.setFixedWidth(35)
-        audio_layout.addWidget(self.chk_mute)
-        audio_layout.addWidget(self.slider_volume)
-        audio_layout.addWidget(self.lbl_volume_val)
-        general_layout.addLayout(audio_layout)
+        self.general_group = QGroupBox()
+        self.general_layout = QVBoxLayout()
         
         # Таймер
-        general_layout.addWidget(QLabel("Таймер смены:"))
-        self.chk_timer = QCheckBox("Включить смену по таймеру")
+        self.general_layout_timer_label = QLabel()
+        self.general_layout.addWidget(self.general_layout_timer_label)
+        self.chk_timer = QCheckBox()
         self.chk_timer.stateChanged.connect(self.on_timer_check_changed)
-        general_layout.addWidget(self.chk_timer)
+        self.general_layout.addWidget(self.chk_timer)
         
-        timer_input_layout = QHBoxLayout()
+        self.timer_input_layout = QHBoxLayout()
         
-        hours_layout = QVBoxLayout()
-        hours_layout.addWidget(QLabel("Часы"))
+        hours_label = QVBoxLayout()
+        self.hours_layout_label = QLabel()
+        hours_label.addWidget(self.hours_layout_label)
         self.spin_hours = QSpinBox()
         self.spin_hours.setRange(0, 23)
         self.spin_hours.setEnabled(False)
-        hours_layout.addWidget(self.spin_hours)
-        timer_input_layout.addLayout(hours_layout)
+        hours_label.addWidget(self.spin_hours)
+        self.timer_input_layout.addLayout(hours_label)
         
         minutes_layout = QVBoxLayout()
-        minutes_layout.addWidget(QLabel("Минуты"))
+        self.minutes_layout_label = QLabel()
+        minutes_layout.addWidget(self.minutes_layout_label)
         self.spin_minutes = QSpinBox()
         self.spin_minutes.setRange(0, 59)
         self.spin_minutes.setEnabled(False)
         minutes_layout.addWidget(self.spin_minutes)
-        timer_input_layout.addLayout(minutes_layout)
+        self.timer_input_layout.addLayout(minutes_layout)
         
         seconds_layout = QVBoxLayout()
-        seconds_layout.addWidget(QLabel("Секунды"))
+        self.seconds_layout_label = QLabel()
+        seconds_layout.addWidget(self.seconds_layout_label)
         self.spin_seconds = QSpinBox()
         self.spin_seconds.setRange(0, 59)
         self.spin_seconds.setEnabled(False)
         seconds_layout.addWidget(self.spin_seconds)
-        timer_input_layout.addLayout(seconds_layout)
+        self.timer_input_layout.addLayout(seconds_layout)
         
-        general_layout.addLayout(timer_input_layout)
+        self.general_layout.addLayout(self.timer_input_layout)
         
         # Случайный порядок
-        self.chk_random_order = QCheckBox("🎲 Случайный порядок смены обоев")
-        general_layout.addWidget(self.chk_random_order)
+        self.chk_random_order = QCheckBox()
+        self.general_layout.addWidget(self.chk_random_order)
         
         # Горячие клавиши
-        general_layout.addWidget(QLabel("Горячие клавиши:"))
+        self.general_layout_hk_label = QLabel()
+        self.general_layout.addWidget(self.general_layout_hk_label)
         
         hk_wall_layout = QHBoxLayout()
-        hk_wall_layout.addWidget(QLabel("Смена обоев:"))
+        self.hk_wall_layout_label = QLabel()
+        hk_wall_layout.addWidget(self.hk_wall_layout_label)
         self.btn_hk_wall = QPushButton("ctrl+alt+w")
         self.btn_hk_wall.clicked.connect(lambda: self.start_recording('wallpaper'))
         hk_wall_layout.addWidget(self.btn_hk_wall)
         hk_wall_layout.addStretch()
-        general_layout.addLayout(hk_wall_layout)
-        
+        self.general_layout.addLayout(hk_wall_layout)
+
+        self.hotkey_msg = ""
+
         hk_group_layout = QHBoxLayout()
-        hk_group_layout.addWidget(QLabel("Смена группы:"))
+        self.hk_group_layout_label = QLabel()
+        hk_group_layout.addWidget(self.hk_group_layout_label)
         self.btn_hk_group = QPushButton("ctrl+alt+g")
         self.btn_hk_group.clicked.connect(lambda: self.start_recording('group'))
         hk_group_layout.addWidget(self.btn_hk_group)
         hk_group_layout.addStretch()
-        general_layout.addLayout(hk_group_layout)
+        self.general_layout.addLayout(hk_group_layout)
         
         # Автозапуск
-        self.chk_autorun = QCheckBox("Автозапуск при старте Windows")
-        general_layout.addWidget(self.chk_autorun)
+        self.chk_autorun = QCheckBox()
+        self.general_layout.addWidget(self.chk_autorun)
         
-        general_group.setLayout(general_layout)
-        right_layout.addWidget(general_group)
+        self.general_group.setLayout(self.general_layout)
+        right_layout.addWidget(self.general_group)
 
         self.group_radio_fill.toggled.connect(lambda: self._save_group_settings())
         self.group_radio_fit.toggled.connect(lambda: self._save_group_settings())
-        self.group_spin_gif_fps.valueChanged.connect(lambda: self._save_group_settings())
 
         # Кнопка сохранения
-        btn_save = QPushButton("💾 Сохранить и применить")
-        btn_save.setMinimumHeight(36)
-        btn_save.setStyleSheet("background-color: #2a82da; color: white; font-weight: bold; padding: 8px;")
-        btn_save.clicked.connect(self.save_all_settings)
-        right_layout.addWidget(btn_save)
+        self.btn_save = QPushButton()
+        self.btn_save.setMinimumHeight(36)
+        self.btn_save.setStyleSheet("background-color: #2a82da; color: white; font-weight: bold; padding: 8px;")
+        self.btn_save.clicked.connect(self.save_all_settings)
+        right_layout.addWidget(self.btn_save)
         
         right_layout.addStretch()
         
@@ -377,21 +353,134 @@ class SettingsWindow(QMainWindow):
         
         h_base_layout.addWidget(left_widget, 1)
         h_base_layout.addWidget(right_scroll, 2)
-        
-        self.setCentralWidget(main_widget)
-        
+
+        top_bar = QHBoxLayout()
+        top_bar.addStretch()
+
+        self.btn_language = QPushButton(self.loc.get_string("select_language"))
+        self.btn_language.setFixedWidth(120)
+        self.btn_language.clicked.connect(self._show_language_dialog)
+        top_bar.addWidget(self.btn_language)
+
+        # Добавляем top_bar в основной layout
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addLayout(top_bar)
+        main_layout.addLayout(h_base_layout, 1)
+
         # Подключаем сигналы после создания всего UI
         self.file_list.currentItemChanged.connect(self.on_file_selected)
         self.file_list.model().rowsMoved.connect(self.on_list_reordered)
         
+        self.setCentralWidget(main_widget)
         self.load_settings_into_ui()
-        
         self.preview_movie = None
 
     def on_scale_mode_changed(self):
         """Обработчик изменения режима масштабирования для файла"""
         self.focus_group.setVisible(self.radio_fit.isChecked())
         self.on_file_setting_changed()
+
+    def _show_language_dialog(self):
+        """Показывает диалог выбора языка"""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QComboBox, QDialogButtonBox
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.loc.get_string("select_language"))
+        dialog.setFixedSize(300, 150)
+        
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(self.loc.get_string("language") + ":"))
+        
+        languages = {
+            "en": "English",
+            "de": "Deutsch",
+            "eo": "Esperanto",
+            "es": "Español",
+            "fr": "Français",
+            "ru": "Русский",
+            "zh": "中文"
+        }
+        
+        combo = QComboBox()
+        for code, name in languages.items():
+            combo.addItem(name, code)
+        
+        current_lang = self.core.config.get("language", "en")
+        for i in range(combo.count()):
+            if combo.itemData(i) == current_lang:
+                combo.setCurrentIndex(i)
+                break
+        
+        layout.addWidget(combo)
+        
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | 
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_lang = combo.currentData()
+            if new_lang != current_lang:
+                self.core.config["language"] = new_lang
+                config_manager.save_config(self.core.config)
+                self.loc.refresh_language(new_lang)
+                self._apply_language()
+                self.core.refresh_config()
+    
+    def _apply_language(self):
+        """Применяет язык к интерфейсу"""
+        self.setWindowTitle(self.loc.get_string("title"))
+        self.btn_language.setText(self.loc.get_string("language"))
+
+        #весь текст в приложении
+        translations = {
+            self.preview_group: "preview",
+            self.file_settings_group: "file_settings",
+            self.group_settings_group: "group_settings",
+            self.btn_save: "save",
+            self.btn_add_file: "add_files",
+            self.btn_remove_file: "remove_files",
+            self.btn_reset: "reset_file",
+            self.btn_move_top: "move_top",
+            self.btn_move_up5: "move_up5",
+            self.btn_move_up1: "move_up",
+            self.btn_move_down1: "move_down",
+            self.btn_move_down5: "move_down5",
+            self.btn_move_bottom: "move_bottom",
+            self.radio_fill: "fill",
+            self.radio_fit: "crop",
+            self.group_radio_fill: "fill",
+            self.group_radio_fit: "crop",
+            self.chk_show_focus_grid: "show_focus_grid",
+            self.group_chk_show_focus: "show_focus_grid",
+            self.chk_timer: "enable_timer",
+            self.chk_random_order: "random_order",
+            self.chk_autorun: "autostart",
+            self.general_group: "general",
+            self.hours_layout_label: "hours",
+            self.minutes_layout_label: "minutes",
+            self.seconds_layout_label: "seconds",
+            self.group_settings_layout_label: "scaling",
+            self.file_settings_layout_label: "scaling",
+            self.left_layout_label: "media_filter",
+            self.hk_group_layout_label: "next_group",
+            self.hk_wall_layout_label: "tray_next",
+            self.general_layout_hk_label: "hotkeys",
+            self.general_layout_timer_label: "timer"
+        }
+
+        for widget, key in translations.items():
+            text = self.loc.get_string(key)
+            if hasattr(widget, 'setTitle'):
+                widget.setTitle(text)
+            elif hasattr(widget, 'setText'):
+                widget.setText(text)
+
+        self.hotkey_msg = self.loc.get_string("press_enter")
+
 
     def remove_group(self):
         """Удаляет текущую группу"""
@@ -401,12 +490,13 @@ class SettingsWindow(QMainWindow):
         
         groups = list(self.core.config["groups"].keys())
         if len(groups) <= 1:
-            QMessageBox.warning(self, "Warning", "Невозможно удалить последную группу")
+            QMessageBox.warning(
+                self, "Warning", self.loc.get_string("last_group"))
             return
         
         reply = QMessageBox.question(
             self, "Удалить группу",
-            f"Удалить '{current_group}' и все ссылки обоев в ней?",
+            self.loc.get_string("delete_group", current_group),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -497,16 +587,12 @@ class SettingsWindow(QMainWindow):
         pass  # Можно добавить логику для отключения кнопок на краях
 
     def refresh_file_list(self):
-        # Блокируем сигналы
-        self.file_list.currentItemChanged.disconnect(self.on_file_selected)
-        
+        self.file_list.blockSignals(True)
         self.file_list.clear()
         current_g = self.group_combo.currentText()
         if current_g in self.core.config["groups"]:
             self.file_list.addItems(self.core.config["groups"][current_g])
-        
-        # Восстанавливаем сигналы
-        self.file_list.currentItemChanged.connect(self.on_file_selected)
+        self.file_list.blockSignals(False)
 
     def _on_scale_mode_changed(self):
         """Обработчик изменения режима масштабирования"""
@@ -556,15 +642,15 @@ class SettingsWindow(QMainWindow):
             return
         
         hints = {
-            'top_left': 'Фокус: левый верхний угол',
-            'top_center': 'Фокус: верхний край',
-            'top_right': 'Фокус: правый верхний угол',
-            'center_left': 'Фокус: левый край',
-            'center_center': 'Фокус: центр изображения',
-            'center_right': 'Фокус: правый край',
-            'bottom_left': 'Фокус: левый нижний угол',
-            'bottom_center': 'Фокус: нижний край',
-            'bottom_right': 'Фокус: правый нижний угол',
+            'top_left': self.loc.get_string("focus_top_left"),
+            'top_center': self.loc.get_string("focus_top"),
+            'top_right': self.loc.get_string("focus_top_right"),
+            'center_left': self.loc.get_string("focus_left"),
+            'center_center': self.loc.get_string("focus_center"),
+            'center_right': self.loc.get_string("focus_right"),
+            'bottom_left': self.loc.get_string("focus_bottom_left"),
+            'bottom_center': self.loc.get_string("focus_bottom"),
+            'bottom_right': self.loc.get_string("focus_bottom_right")
         }
         
         self.focus_hint_label.setText(hints.get(focus_name, ""))
@@ -606,14 +692,6 @@ class SettingsWindow(QMainWindow):
                 
                 # Активируем чекбокс только в режиме обрезки
                 self.chk_show_focus_grid.setEnabled(self.radio_fit.isChecked())
-                
-                # GIF настройки
-                self.spin_gif_fps.blockSignals(True)
-                self.spin_gif_fps.setValue(settings.get("gif_fps", 10))
-                self.spin_gif_fps.blockSignals(False)
-                
-                ext = path.lower()
-                self.gif_widget.setVisible(ext.endswith('.gif'))
             else:
                 self.file_settings_group.setEnabled(False)
         else:
@@ -632,8 +710,7 @@ class SettingsWindow(QMainWindow):
         settings = {
             "customized": True,
             "scale_mode": "fill" if self.radio_fill.isChecked() else "fit",
-            "focus_point": self.get_selected_focus(),
-            "gif_fps": self.spin_gif_fps.value()
+            "focus_point": self.get_selected_focus()
         }
         
         config_manager.set_file_settings(self.core.config, path, settings)
@@ -682,13 +759,12 @@ class SettingsWindow(QMainWindow):
     def start_recording(self, target):
         self.recording_target = target
         self.current_recorded_keys = []
-        
-        msg = "Ввод... ENTER"
+
         if target == 'wallpaper':
-            self.btn_hk_wall.setText(msg)
+            self.btn_hk_wall.setText(self.hotkey_msg)
             self.btn_hk_wall.setStyleSheet("background-color: #d1a100;")
         else:
-            self.btn_hk_group.setText(msg)
+            self.btn_hk_group.setText(self.hotkey_msg)
             self.btn_hk_group.setStyleSheet("background-color: #d1a100;")
         self.grabKeyboard()
 
@@ -756,10 +832,11 @@ class SettingsWindow(QMainWindow):
         if text:
             self.core.config["current_group"] = text
             self.refresh_file_list()
-            self._load_group_settings()
 
     def add_new_group(self):
-        name, ok = QInputDialog.getText(self, "Новая группа", "Название:")
+        name, ok = QInputDialog.getText(
+            self, self.loc.get_string("new_group"),
+            self.loc.get_string("group_name"))
         if ok and name.strip():
             name = name.strip()
             if name not in self.core.config["groups"]:
@@ -801,12 +878,13 @@ class SettingsWindow(QMainWindow):
                 dup_names = "\n".join(duplicates)
                 QMessageBox.information(
                     self, "Дупликаты пропущены",
-                    f"Изображения добавлены в группу:\n{dup_names}"
+                    self.loc.get_string("success")
                 )
             else:
                 QMessageBox.information(
                     self, "Дупликаты пропущены",
-                    f"{len(duplicates)} добавляемые файлы уже есть в группе."
+                    self.loc.get_string("duplicates_skipped",
+                                        len(duplicates))
                 )
         
         # Сообщение об успехе
@@ -837,15 +915,15 @@ class SettingsWindow(QMainWindow):
     def _update_group_focus_hint(self, focus_name=None):
         """Обновляет подсказку для группового фокуса"""
         hints = {
-            'top_left': 'Focus: Top-Left',
-            'top_center': 'Focus: Top-Center',
-            'top_right': 'Focus: Top-Right',
-            'center_left': 'Focus: Mid-Left',
-            'center_center': 'Focus: Center',
-            'center_right': 'Focus: Mid-Right',
-            'bottom_left': 'Focus: Bottom-Left',
-            'bottom_center': 'Focus: Bottom-Center',
-            'bottom_right': 'Focus: Bottom-Right',
+            'top_left': self.loc.get_string("focus_top_left"),
+            'top_center': self.loc.get_string("focus_top"),
+            'top_right': self.loc.get_string("focus_top_right"),
+            'center_left': self.loc.get_string("focus_left"),
+            'center_center': self.loc.get_string("focus_center"),
+            'center_right': self.loc.get_string("focus_right"),
+            'bottom_left': self.loc.get_string("focus_bottom_left"),
+            'bottom_center': self.loc.get_string("focus_bottom"),
+            'bottom_right': self.loc.get_string("focus_bottom_right")
         }
         
         if focus_name:
@@ -861,7 +939,6 @@ class SettingsWindow(QMainWindow):
         settings = {
             "scale_mode": "fill" if self.group_radio_fill.isChecked() else "fit",
             "focus_point": self.get_selected_focus(),
-            "gif_fps": self.group_spin_gif_fps.value()
         }
         
         config_manager.set_group_settings(self.core.config, group_name, settings)
@@ -889,14 +966,13 @@ class SettingsWindow(QMainWindow):
         self.group_chk_show_focus.setEnabled(self.group_radio_fit.isChecked())
         if not self.group_radio_fit.isChecked():
             self.group_chk_show_focus.setChecked(False)
-        
-        self.group_spin_gif_fps.setValue(settings.get("gif_fps", 10))
 
     def load_settings_into_ui(self):
         cfg = self.core.config
         self.group_combo.clear()
         self.group_combo.addItems(cfg["groups"].keys())
         self.group_combo.setCurrentText(cfg["current_group"])
+        self._apply_language()
         
         # Загружаем настройки группы
         self._load_group_settings()
@@ -929,11 +1005,7 @@ class SettingsWindow(QMainWindow):
         self.temp_group_hk = cfg.get("group_hotkey", "ctrl+alt+g")
         self.btn_hk_wall.setText(self.temp_wall_hk.upper())
         self.btn_hk_group.setText(self.temp_group_hk.upper())
-        
-        self.slider_volume.setValue(cfg.get("volume", 50))
-        self.chk_mute.setChecked(cfg.get("mute", False))
-        self.lbl_volume_val.setText(f"{self.slider_volume.value()}%")
-        
+
         self.refresh_file_list()
 
     def save_all_settings(self):
@@ -953,8 +1025,6 @@ class SettingsWindow(QMainWindow):
         self.core.config["timer_interval_seconds"] = total_seconds
         
         self.core.config["autorun"] = self.chk_autorun.isChecked()
-        self.core.config["volume"] = self.slider_volume.value()
-        self.core.config["mute"] = self.chk_mute.isChecked()
         self.core.config["hotkey"] = self.temp_wall_hk
         self.core.config["group_hotkey"] = self.temp_group_hk
         
@@ -967,7 +1037,9 @@ class SettingsWindow(QMainWindow):
             self.core.wallpaper_index = 0
             self.core.next_wallpaper()
         
-        QMessageBox.information(self, "Успех", "Конфигурация обновлена!")
+        QMessageBox.information(
+            self, self.loc.get_string("success"),
+            self.loc.get_string("success"))
         self.hide()
 
     def closeEvent(self, event):

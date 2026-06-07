@@ -1,7 +1,8 @@
 import os
 import sys
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
-from PyQt6.QtGui import QIcon, QAction
+
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 
 def get_resource_path(relative_path):
@@ -17,8 +18,9 @@ def get_resource_path(relative_path):
 
 
 class TrayManager:
-    def __init__(self, callbacks):
+    def __init__(self, callbacks, localizer):
         self.callbacks = callbacks
+        self.loc = localizer
         self.tray_icon = QSystemTrayIcon()
 
         icon_path = get_resource_path("icon.png")
@@ -35,33 +37,51 @@ class TrayManager:
         self.tray_icon.show()
     
     def _setup_menu(self):
-        """Создает меню трея"""
         menu = QMenu()
-        
-        act_settings = QAction("Натройки", menu)
-        act_settings.triggered.connect(self.callbacks['show_settings'])
-        menu.addAction(act_settings)
-        menu.addSeparator()
-        
-        act_next = QAction("Следующие обои", menu)
-        act_next.triggered.connect(self.callbacks['next_wallpaper'])
-        menu.addAction(act_next)
 
-        act_next_group = QAction("Следующая группа", menu)
-        act_next_group.triggered.connect(self.callbacks['next_group'])
-        menu.addAction(act_next_group)
+        self.act_settings = QAction(menu)
+        self.act_settings.triggered.connect(self.callbacks['show_settings'])
+        menu.addAction(self.act_settings)
         menu.addSeparator()
         
-        self.groups_menu = QMenu("Выбрать группу", menu)
+        self.act_next = QAction(menu)
+        self.act_next.triggered.connect(self.callbacks['next_wallpaper'])
+        menu.addAction(self.act_next)
+        
+        self.act_next_group = QAction(menu)
+        self.act_next_group.triggered.connect(self.callbacks['next_group'])
+        menu.addAction(self.act_next_group)
+        menu.addSeparator()
+        
+        self.groups_menu = QMenu(menu)
         menu.addMenu(self.groups_menu)
         menu.addSeparator()
         
-        act_exit = QAction("Выйти", menu)
-        act_exit.triggered.connect(self.callbacks['exit_app'])
-        menu.addAction(act_exit)
+        self.act_exit = QAction(menu)
+        self.act_exit.triggered.connect(self.callbacks['exit_app'])
+        menu.addAction(self.act_exit)
         
         self.tray_icon.setContextMenu(menu)
-    
+
+        self.apply_language_to_tray()
+
+    def apply_language_to_tray(self):
+        """Обновляет язык в трее"""
+        translations = {
+            self.act_settings: "tray_settings",
+            self.act_next: "tray_next",
+            self.act_next_group: "tray_next_group",
+            self.groups_menu: "tray_select_group",
+            self.act_exit: "tray_exit"
+        }
+
+        for tray_element, key in translations.items():
+            text = self.loc.get_string(key)
+            if hasattr(tray_element, "setText"):
+                tray_element.setText(text)
+            elif hasattr(tray_element, "setTitle"):
+                tray_element.setTitle(text)
+
     def update_groups_menu(self, groups, current_group, callback):
         """Обновляет подменю групп"""
         self.groups_menu.clear()

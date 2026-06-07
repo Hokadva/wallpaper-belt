@@ -1,51 +1,58 @@
-import sys
 import random
+import sys
 import traceback
+
+from PyQt6.QtCore import QSharedMemory, QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import QTimer, QSharedMemory
 
 import modules.config_manager as config_manager
-from modules.wallpaper_window import WallpaperBelt
 from modules.hotkey_manager import HotkeyManager
-from modules.tray_manager import TrayManager
 from modules.settings_ui import SettingsWindow
-
+from modules.tray_manager import TrayManager
+from modules.wallpaper_window import WallpaperBelt
+from modules.localizer import Localizer
 
 class WallpaperApp:
     """Главный класс приложения"""
     
     def __init__(self):
         self.config = config_manager.load_config()
+        
+        # Инициализация локализатора
+        self.localizer = Localizer(self.config.get("language", "en"))
+        
         self.wallpaper_index = 0
         
-        # Инициализация компонентов
         self.engine = WallpaperBelt()
         self.hotkeys = HotkeyManager()
-        self.settings_ui = SettingsWindow(self)
+        self.settings_ui = SettingsWindow(self, self.localizer)
         
-        # Трей
         self.tray = TrayManager({
             'show_settings': self.show_settings,
             'next_wallpaper': self.next_wallpaper,
+            'random_wallpaper': self.random_wallpaper,
             'next_group': self.next_group,
             'select_group': self.select_group,
             'exit_app': self.exit_app
-        })
+        }, self.localizer)
         
-        # Таймер
         self.timer = QTimer()
         self.timer.timeout.connect(self._timer_tick)
         
-        # Подключаем хоткеи
         self.hotkeys.wallpaper_trigger.connect(self.next_wallpaper)
         self.hotkeys.group_trigger.connect(self.next_group)
         
-        # Применяем настройки
         self._apply_settings()
-        
-        # Загружаем первые обои
         QTimer.singleShot(1000, self.next_wallpaper)
-    
+
+    def refresh_config(self):
+        self.config = config_manager.load_config()
+        self.loc.refresh_language(self.config.get("language", "en"))
+        self._apply_settings()
+        # Пересоздаем меню трея с новым языком
+        self.tray.loc = self.loc
+        self.tray._setup_menu()
+
     def _apply_settings(self):
         """Применяет все настройки"""
         # Таймер
@@ -76,6 +83,8 @@ class WallpaperApp:
             self.config.get("current_group", "Default"),
             self.select_group
         )
+
+        self.tray.apply_language_to_tray()
     
     def _timer_tick(self):
         """Обработчик таймера"""

@@ -15,6 +15,7 @@ DEFAULT_CONFIG = {
     "group_hotkey": "ctrl+alt+g",
     "autorun": False,
     "volume": 50,
+    "language": "en",
     "mute": False,
     "random_order": False,
     "groups": {

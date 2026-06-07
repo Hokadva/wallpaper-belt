@@ -1,6 +1,7 @@
 import keyboard
 from PyQt6.QtCore import QObject, pyqtSignal
 
+
 class HotkeyManager(QObject):
     """Управление горячими клавишами"""
     

@@ -1,13 +1,19 @@
 import ctypes
 import os
-from PyQt6.QtCore import Qt, QUrl, QTimer
-from PyQt6.QtGui import QPixmap, QMovie, QGuiApplication
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QVideoSink
-import modules.config_manager as config_manager
+import tempfile
+import time
 import winreg
+
+from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtGui import QGuiApplication, QMovie, QPixmap
+from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoSink
+
+import modules.config_manager as config_manager
+
 
 class WallpaperBelt:
     """Движок для установки обоев рабочего стола"""
+    
     def __init__(self):
         self.media_player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -20,29 +26,28 @@ class WallpaperBelt:
         self.media_player.setLoops(QMediaPlayer.Loops.Infinite)
         
         self.current_file_path = None
-        self.current_frame_path = None
         self.current_wallpaper_path = None
         
-        # GIF анимация
+        # GIF
         self.gif_movie = None
         self.gif_timer = QTimer()
         self.gif_timer.timeout.connect(self._update_gif_frame)
+        self._last_gif_update = 0
+        self._gif_min_interval = 0.1
         
-        # Видимость рабочего стола
+        # Видимость
         self.desktop_visible = True
         self.visibility_timer = QTimer()
         self.visibility_timer.timeout.connect(self._check_desktop_visibility)
-        self.visibility_timer.start(500)
+        self.visibility_timer.start(1000)
     
     def set_wallpaper(self, path):
-        """Устанавливает обои (изображение, GIF или видео)"""
         if not path or not os.path.exists(path):
             return
             
         path = os.path.normpath(path)
         self.current_file_path = path
         
-        # Останавливаем всё
         self._stop_all()
         
         ext = path.lower()
@@ -60,8 +65,9 @@ class WallpaperBelt:
             if self.desktop_visible:
                 config = config_manager.load_config()
                 settings = config_manager.get_file_settings(config, path)
-                fps = settings.get("gif_fps", 10)
-                interval = max(33, 1000 // fps)
+                target_fps = min(settings.get("gif_fps", 10), 15)
+                interval = max(67, 1000 // target_fps)
+                self._gif_min_interval = interval / 1000.0
                 self.gif_timer.start(interval)
         else:
             pixmap = QPixmap(path)
@@ -69,24 +75,20 @@ class WallpaperBelt:
                 self._set_pixmap(pixmap, path)
     
     def update_audio(self, volume, muted):
-        """Обновляет настройки аудио"""
         self.audio_output.setMuted(muted)
         self.audio_output.setVolume(volume / 100.0)
     
     def stop(self):
-        """Останавливает все процессы"""
         self.visibility_timer.stop()
         self._stop_all()
         
-        for temp_file in [self.current_frame_path, self.current_wallpaper_path]:
-            if temp_file and os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
+        if self.current_wallpaper_path and os.path.exists(self.current_wallpaper_path):
+            try:
+                os.remove(self.current_wallpaper_path)
+            except:
+                pass
     
     def _stop_all(self):
-        """Останавливает все анимации и видео"""
         self.media_player.stop()
         self.gif_timer.stop()
         
@@ -94,16 +96,11 @@ class WallpaperBelt:
             self.gif_movie.stop()
             self.gif_movie = None
         
-        if self.current_frame_path and os.path.exists(self.current_frame_path):
-            try:
-                os.remove(self.current_frame_path)
-            except:
-                pass
-            self.current_frame_path = None
+        self._last_gif_update = 0
     
     def _set_pixmap(self, pixmap, file_path=None):
-        """Устанавливает QPixmap как обои с учетом настроек"""
-        if pixmap.isNull() or not self.desktop_visible:
+        """Устанавливает статичное изображение"""
+        if pixmap.isNull():
             return
         
         screen = QGuiApplication.primaryScreen()
@@ -113,7 +110,7 @@ class WallpaperBelt:
         settings = config_manager.get_file_settings(config, file_path) if file_path else {}
         
         scale_mode = settings.get("scale_mode", "fill")
-        focus_point = settings.get("focus_point", "center")
+        focus_point = settings.get("focus_point", "center_center")
         
         if scale_mode == "fit":
             scaled = pixmap.scaled(
@@ -129,20 +126,83 @@ class WallpaperBelt:
                 Qt.TransformationMode.SmoothTransformation
             )
         
-        temp_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Temp")
-        temp_path = os.path.join(temp_dir, "wallpaper_current.png")
+        temp_path = os.path.join(tempfile.gettempdir(), "wallpaper_static.bmp")
         
-        if final.save(temp_path, "PNG"):
+        if final.save(temp_path, "BMP"):
             self._apply_wallpaper(temp_path)
             self.current_wallpaper_path = temp_path
     
+    def _update_gif_frame(self):
+        """Обновляет кадр GIF с троттлингом"""
+        if not self.desktop_visible:
+            return
+
+        now = time.time()
+        if now - self._last_gif_update < self._gif_min_interval:
+            return
+
+        self._last_gif_update = now
+
+        if self.gif_movie and self.gif_movie.state() == QMovie.MovieState.Running:
+            pixmap = self.gif_movie.currentPixmap()
+            if not pixmap.isNull():
+                self._apply_frame_fast(pixmap)
+
+    def _apply_frame_fast(self, pixmap):
+        """Быстрое применение кадра без сложной обработки"""
+        screen = QGuiApplication.primaryScreen()
+        screen_size = screen.size()
+
+        config = config_manager.load_config()
+        settings = config_manager.get_file_settings(config, self.current_file_path)
+
+        scale_mode = settings.get("scale_mode", "fill")
+        focus_point = settings.get("focus_point", "center_center")
+        
+        # Быстрое масштабирование
+        if scale_mode == "fit":
+            scaled = pixmap.scaled(
+                screen_size,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.FastTransformation  # Быстрее чем Smooth
+            )
+            final = self._crop_with_focus(scaled, screen_size, focus_point)
+        else:
+            final = pixmap.scaled(
+                screen_size,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.FastTransformation
+            )
+        
+        # Используем фиксированный временный файл
+        temp_path = os.path.join(tempfile.gettempdir(), "wallpaper_frame.bmp")
+        
+        try:
+            if final.save(temp_path, "BMP"):
+                # Быстрое применение
+                ctypes.windll.user32.SystemParametersInfoW(20, 0, temp_path, 0x02)
+        except:
+            pass
+    
+    def _process_video_frame(self, frame):
+        """Кадры видео тоже с троттлингом"""
+        if not self.desktop_visible or not frame.isValid():
+            return
+        
+        now = time.time()
+        if now - self._last_gif_update < 0.1:  # Не чаще 10 FPS для видео
+            return
+        self._last_gif_update = now
+        
+        image = frame.toImage()
+        if not image.isNull():
+            self._apply_frame_fast(QPixmap.fromImage(image))
+    
     def _crop_with_focus(self, pixmap, target_size, focus_point):
-        """Обрезает изображение с учетом точки фокуса"""
         src_w, src_h = pixmap.width(), pixmap.height()
         tgt_w, tgt_h = target_size.width(), target_size.height()
         
-        x = 0
-        y = 0
+        x, y = 0, 0
         
         if src_w > tgt_w:
             if "right" in focus_point:
@@ -162,11 +222,9 @@ class WallpaperBelt:
         return pixmap.copy(int(x), int(y), int(tgt_w), int(tgt_h))
     
     def _apply_wallpaper(self, image_path):
-        """Применяет обои через реестр (не сохраняет в историю)"""
         try:
             abs_path = os.path.abspath(image_path)
             
-            # Устанавливаем стиль Fill
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 r"Control Panel\Desktop",
@@ -174,35 +232,12 @@ class WallpaperBelt:
             )
             winreg.SetValueEx(key, "WallpaperStyle", 0, winreg.REG_SZ, "10")
             winreg.SetValueEx(key, "TileWallpaper", 0, winreg.REG_SZ, "0")
-            
-            # Устанавливаем путь к обоям напрямую в реестр
             winreg.SetValueEx(key, "Wallpaper", 0, winreg.REG_SZ, abs_path)
             winreg.CloseKey(key)
             
-            # Применяем без сохранения в историю
-            SPI_SETDESKWALLPAPER = 20
-            SPIF_SENDCHANGE = 0x02  # Только обновить, не сохранять в профиль
-            
-            ctypes.windll.user32.SystemParametersInfoW(
-                SPI_SETDESKWALLPAPER, 0, abs_path, SPIF_SENDCHANGE
-            )
+            ctypes.windll.user32.SystemParametersInfoW(20, 0, abs_path, 0x02)
         except Exception as e:
             print(f"[ERROR] Failed to set wallpaper: {e}")
-    
-    def _process_video_frame(self, frame):
-        if not self.desktop_visible or not frame.isValid():
-            return
-        image = frame.toImage()
-        if not image.isNull():
-            self._set_pixmap(QPixmap.fromImage(image), self.current_file_path)
-    
-    def _update_gif_frame(self):
-        if not self.desktop_visible:
-            return
-        if self.gif_movie and self.gif_movie.state() == QMovie.MovieState.Running:
-            pixmap = self.gif_movie.currentPixmap()
-            if not pixmap.isNull():
-                self._set_pixmap(pixmap, self.current_file_path)
     
     def _check_desktop_visibility(self):
         try:
@@ -219,21 +254,26 @@ class WallpaperBelt:
                 desk = ctypes.windll.user32.FindWindowW("Progman", None)
                 is_desktop = fg == desk
                 
+                was_visible = self.desktop_visible
                 self.desktop_visible = not is_fullscreen or is_desktop
                 
-                if not self.desktop_visible:
+                if was_visible and not self.desktop_visible:
+                    # Скрыт - пауза
                     if self.gif_movie:
                         self.gif_movie.setPaused(True)
                         self.gif_timer.stop()
                     if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
                         self.media_player.pause()
-                else:
+                        
+                elif not was_visible and self.desktop_visible:
                     if self.gif_movie and self.gif_movie.state() == QMovie.MovieState.Paused:
                         self.gif_movie.setPaused(False)
                         config = config_manager.load_config()
                         settings = config_manager.get_file_settings(config, self.current_file_path)
-                        fps = settings.get("gif_fps", 10)
-                        self.gif_timer.start(max(33, 1000 // fps))
+                        target_fps = min(settings.get("gif_fps", 10), 15)
+                        interval = max(67, 1000 // target_fps)
+                        self._gif_min_interval = interval / 1000.0
+                        self.gif_timer.start(interval)
                     if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PausedState:
                         self.media_player.play()
         except:
